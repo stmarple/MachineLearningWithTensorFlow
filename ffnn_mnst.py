@@ -105,3 +105,14 @@ model.add(Dense(units=32, activation='sigmoid', input_shape=(image_size,)))
 model.add(Dense(units=num_classes, activation='softmax'))
 model.summary()
 
+"""### This model contains a special activation function: the softmax.
+What makes it special is that it normalizes the values from the 10 output nodes in such a way that:
+* all the values are between 0 and 1
+* the sum of all 10 values = 1
+
+To put it another way, Softmax "calculates the probabilities distribution of the event over 'n' different events".  In this case, there are 10 possible probabilities, with the largest as the prediction vector.  These probabilities "will be helpful when determining the target class for the given inputs".
+
+More information on activation functions can be found here:
+https://ml-cheatsheet.readthedocs.io/en/latest/activation_functions.html
+"""
+
