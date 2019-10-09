@@ -14,30 +14,58 @@ https://en.wikipedia.org/wiki/MNIST_database
 from __future__ import absolute_import, division, print_function, unicode_literals
 import tensorflow as tf
 
-"""## **Load and Prepare the MNIST Dataset**"""
+"""### **Load and Prepare the MNIST Dataset**"""
 
 mnist = tf.keras.datasets.mnist
 
 (x_train, y_train), (x_test, y_test) = mnist.load_data()
 x_train, x_test = x_train / 255.0, x_test / 255.0
 
-"""## **Build the `tf.keras.Sequential` model by stacking layers**"""
+"""### **Build the `tf.keras.Sequential` model by stacking layers**"""
 
-model = tf.keras.models.Sequential([
+modelA = tf.keras.models.Sequential([
   tf.keras.layers.Flatten(input_shape=(28, 28)),
   tf.keras.layers.Dense(256, activation='relu'),
   tf.keras.layers.Dropout(0.2),
   tf.keras.layers.Dense(10, activation='softmax')
 ])
 
-model.compile(optimizer='adam', loss='sparse_categorical_crossentropy', metrics=['accuracy'])
+modelA.compile(optimizer='adam', loss='sparse_categorical_crossentropy', metrics=['accuracy'])
 
-"""## **Train and evaluate the model**"""
+"""### **Train and evaluate the model**
+Before we begin, we should go over a few important **hyperparameters**:
 
-model.fit(x_train, y_train, epochs=5)
-model.evaluate(x_test,  y_test, verbose=2)
+1. epoch, which is the total training sequences
+2. batch_size, which is the training batch size
+3. display_freq, which is the frequency of results displaying
+4. learning_rate, which is the initial optimization learning rate
 
-"""# Classification of MNIST Digits
+see https://www.easy-tensorflow.com/tf-tutorials/neural-networks/two-layer-neural-network?view=article&id=124:two-layer-neural-network for more information.
+"""
+
+historyA = modelA.fit(x_train, y_train, epochs=5)
+loss, accuracy  = modelA.evaluate(x_test,  y_test, verbose=2)
+
+import matplotlib.pyplot as plt
+
+plt.plot(historyA.history['acc'])
+plt.title('model accuracy')
+plt.ylabel('accuracy')
+plt.xlabel('epoch')
+plt.legend(['training', 'validation'], loc='best')
+plt.show()
+
+print(f'Test loss: {loss:.3}')
+print(f'Test accuracy: {accuracy:.3}')
+
+img = int(input('Enter an index over 4440: '))
+plt.imshow(x_test[img].reshape(28,28),cmap='Greys')
+pred = modelA.predict(x_test[img].reshape(1, 28, 28))
+print(pred.argmax())
+
+"""---
+
+# Classification of MNIST Digits
 https://medium.com/tebs-lab/how-to-classify-mnist-digits-with-different-neural-network-architectures-39c75a0f03e3
 
 **Shape**
@@ -59,10 +87,10 @@ from keras.datasets import mnist
 
 # Setup train and test splits
 (x_train, y_train), (x_test, y_test) = mnist.load_data()
-print('Training label shape: '   , y_train.shape) # (60000,) -- 60000 numbers (all 0-9)
+print('Training label shape: '   , y_train.shape) # 60000 numbers (all 0-9)
 print('First 5 training labels: ', y_train[:5]) # [5, 0, 4, 1, 9]
 
-# Convert to "one-hot" vectors using the to_categorical function
+# Convert to vectors using the to_categorical function
 num_classes = 10
 y_train = keras.utils.to_categorical(y_train, num_classes)
 y_test = keras.utils.to_categorical(y_test, num_classes)
@@ -92,15 +120,28 @@ Documentation: https://keras.io/models/sequential/
 The input layer requires the special input_shape parameter which should match the shape of our training data.
 
 The **image_size** is a created by flattening an image to **28 X 28 or 28^2 = 784**
+
+**num_classes** represents the number of output nodes or probabilities
+
+This model has **a single hidden layer**, **that has 32 nodes, or 32 biases** using the sigmoid activation function
+
+And, since there are 784 square units, on 1 layer, that has 32 nodes, there are **784 x 1 x 32 = 25,088 weights**, where weights represent the number of pixels
+
+Therefore, there are 25,088 + 32 biases = **25,120 parameters**
+
+There are 32 x 10, or **320 weights from hidden layer to output layer**.
+
+Each of the 10 nodes adds a single bias >> 25,120 par + 320 weights + 10 nodes = **25,450 total parameters**
 """
 
-from keras.layers import Dense 
+from keras.layers import Dense, Flatten 
 from keras.models import Sequential 
 
 image_size = 784 # 28*28
 num_classes = 10 # ten unique digits
 
 model = Sequential()
+model.add(Flatten(input_shape=(28, 28)))
 model.add(Dense(units=32, activation='sigmoid', input_shape=(image_size,)))
 model.add(Dense(units=num_classes, activation='softmax'))
 model.summary()
@@ -114,5 +155,70 @@ To put it another way, Softmax "calculates the probabilities distribution of the
 
 More information on activation functions can be found here:
 https://ml-cheatsheet.readthedocs.io/en/latest/activation_functions.html
+
+## Train and Evaluate The Model
+"""
+
+model.compile(optimizer="sgd", loss='categorical_crossentropy', metrics=['accuracy'])
+
+history = model.fit(x_train, y_train, batch_size=128, epochs=5, validation_split=0.05)
+loss, accuracy  = model.evaluate(x_test, y_test, verbose=False)
+
+"""### Graph That"""
+
+import matplotlib.pyplot as plt
+
+plt.plot(history.history['acc'])
+plt.plot(history.history['val_acc'])
+plt.title('model accuracy')
+plt.ylabel('accuracy')
+plt.xlabel('epoch')
+plt.legend(['training', 'validation'], loc='best')
+plt.show()
+
+print(f'Test loss: {loss:.3}')
+print(f'Test accuracy: {accuracy:.3}')
+
+"""## Create, Test, Evaluate, and Graph Again
+This time, rather than having a single layer with only 32 nodes, let's increase that to 128 nodes
+"""
+
+image_size = 784 # 28*28
+num_classes = 10 # ten unique digits
+
+model = Sequential()
+model.add(Flatten(input_shape=(28, 28)))
+model.add(Dense(units=128, activation='sigmoid', input_shape=(image_size,))) # increase from 32 nodes to 128 **
+model.add(Dense(units=num_classes, activation='softmax'))
+model.summary()
+
+model.compile(optimizer="sgd", loss='categorical_crossentropy', metrics=['accuracy'])
+
+history = model.fit(x_train, y_train, batch_size=128, epochs=5, validation_split=0.1)
+loss, accuracy  = model.evaluate(x_test, y_test, verbose=False)
+
+plt.plot(history.history['acc'])
+plt.plot(history.history['val_acc'])
+plt.title('model accuracy')
+plt.ylabel('accuracy')
+plt.xlabel('epoch')
+plt.legend(['training', 'validation'], loc='best')
+plt.show()
+
+print(f'Test loss: {loss:.3}')
+print(f'Test accuracy: {accuracy:.3}')
+
+"""It looks like the training model has gotten much better.  However, there is still much to be done about the test loss of more than 32%.
+
+### Let's see what this model can predict...
+"""
+
+img = int(input('Enter an index over 4440: '))
+plt.imshow(x_test[img].reshape(28,28),cmap='Greys')
+pred = model.predict(x_test[img].reshape(1, 28, 28))
+print(pred.argmax())
+
+"""## Network Depth and Layer Width
+https://medium.com/tebs-lab/how-to-classify-mnist-digits-with-different-neural-network-architectures-39c75a0f03e3 **continues...**
 """
 
