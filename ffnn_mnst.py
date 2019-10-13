@@ -46,6 +46,26 @@ see https://www.easy-tensorflow.com/tf-tutorials/neural-networks/two-layer-neura
 historyA = modelA.fit(x_train, y_train, epochs=5)
 loss, accuracy  = modelA.evaluate(x_test,  y_test, verbose=2)
 
+"""**Shape**
+
+From here, we can extrapolate that the training data set has 60,000 samples of images with the dimensions 28 X 28.  We also see that the test sample is composed of 10,000 samples of images of the same dimensions.
+"""
+
+print('Training data shape: ', x_train.shape)
+print('Test data shape: ', x_test.shape)
+
+"""**Flatten Images**
+
+The image vector size is the square units of each image.  In this case, 28 * 28, or 784.   
+As we saw above, x_train = [60000, 28, 28], so x_train[0] is equal to our sample size, or 60,000.    
+As the section says, we are trying to flatten this image.  Rather than being 3 dimensional 60k X 28 X 28,
+we are flattening the image population down to area.  So we will be down to (sample size, area) for each: training set and test set.
+"""
+
+img_vector_size = 28**2
+x_train = x_train.reshape(x_train.shape[0], img_vector_size)
+x_test = x_test.reshape(x_test.shape[0], img_vector_size)
+
 import matplotlib.pyplot as plt
 
 plt.plot(historyA.history['acc'])
@@ -58,29 +78,137 @@ plt.show()
 print(f'Test loss: {loss:.3}')
 print(f'Test accuracy: {accuracy:.3}')
 
-img = int(input('Enter an index over 4440: '))
+"""*** Now that looks like some good accuracy, with small amounts of test loss! ***
+
+Let's see what it looks like when applied to a hand-written digit...
+"""
+
+from random import randint,sample
+
+def test_model(img):
+  plt.figure
+  plt.imshow(x_test[img].reshape(28,28),cmap='Greys')
+  pred = modelA.predict(x_test[img].reshape(1, 28, 28))
+  return pred.argmax()
+
+img = randint(1,5000)
 plt.imshow(x_test[img].reshape(28,28),cmap='Greys')
 pred = modelA.predict(x_test[img].reshape(1, 28, 28))
 print(pred.argmax())
 
-"""---
+"""*** Looks like this classifies these digits pretty well! ***
+# In this next section... 
+We will discuss alternate methods of achieving similiar success.  We will look to add nodes and layers, we will choose different optimizers and activation functions and see how that changes the outcome.  We will also go step-by-step on the models work, what each optimizer and activation functions are [that we may use in a problem like this], as well as how the steps are calculated to get a decent understanding on how the model works behind the scenes to enable us to build a foundation for understanding machine learning.
+
+---
 
 # Classification of MNIST Digits
-https://medium.com/tebs-lab/how-to-classify-mnist-digits-with-different-neural-network-architectures-39c75a0f03e3
+https://medium.com/tebs-lab/how-to-classify-mnist-digits-with-different-neural-network-architectures-39c75a0f03e3 
 
-**Shape**
+Before we get started, there a just few things we should talk about:  
+* **Training data** is the data that our model will be learning from
+* **Test data** is the data that is kept a secret until after the model has been trained, and then evaluated against
+* A **loss function** is used to quantify how accurate our model's predictions are. 
+  These are the amount of error involved.  Some typical loss functions are:
+  - Mean Squared Error (MSE)
+  - Mean Absolute Error (MAE)
+  - Mean Bias Error (MBE)
+  - Cross Entropy Loss / Negative Log Likelihood
+  
+  Many of these I have seen in my studies in Statistics
+* An **optimization algorithm** controls the weights, that are adjusted during training.
+
+
+
+For more information on loss functions, you can find it here:
+
+https://towardsdatascience.com/common-loss-functions-in-machine-learning-46af0ffc4d23
+
+### Calculating Cross Entropy Loss
+Since Cross Entropy Loss is the most common setting for classification problems, we will take a closer look at its calculation.
 """
 
-print('Training data shape: ', x_train.shape)
-print('Test data shape: ', x_test.shape)
+from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import log_loss
+import numpy as np
 
-"""**Flatten Images**"""
+"""# Cross Entropy:
+## H(p, q) = E<sub>p</sub> [ -log q(x) ] = -$\sum_{i}^C$ p<sub>i</sub>(x) * Log q<sub>i</sub>(x)
+Where:
+* p is the true probability, given the distribution
+* q is the predicted value of the current model
+* C is the number of classes, which in our digit classification problem, would be 10
+* The above formula is how we find it in many websites.  However, the log is actually base e, not implied base 10, so it should actually be log<sub>e</sub> , or LN. So from now on, in this document, LN is how I'll be writing it; to avoid further confusion.
 
-img_vector_size = 28**2
-x_train = x_train.reshape(x_train.shape[0], img_vector_size)
-x_test = x_test.reshape(x_test.shape[0], img_vector_size)
+### _So, let's try to understand this a bit_
+ 
+Say we have an image of digits: a 2 and a 9.
+Each image can only be entirely one number on a scale of 0 to 9. 
 
-"""### Create a Vector"""
+#### Therefore our vector would look like this: 
+
+> p<sub>1</sub> = [0, 0, 1, 0, 0, 0, 0, 0, 0, 0]
+
+There is 0 probability of being any other number but the one the image is supposed to be.
+
+### Now, let's say we have a machine learning model that classifies the image with probabilities of:
+
+> q<sub>1</sub> = [0.0, 0.0, 0.65, 0.15, 0.0, 0.0, 0.0, 0.20, 0.0, 0.0]
+
+Cross entropy can be calculated on this single image as:
+
+## -$\sum_{i}^C$ p<sub>i</sub>(x) * LN q<sub>i</sub>(x)
+
+= - (0 * LN(0) + 0 * LN(0) + 1 * LN(0.65) + 0 * LN(0.15) + 0 * LN(0) + 0 * LN(0.20) + 0 * LN(0) + 0 * LN(0) + 0 * LN(0) + 0 * LN(0))
+
+= - (LN(0.65))
+
+= 0.43078
+
+### Now, lets say the model was able to get better and classifies the probabilies of this image as:
+q<sub>1</sub> = [0.0, 0.0, 0.95, 0.05, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+
+So, 
+
+## -$\sum_{i}^C$ p<sub>i</sub>(x) * LN q<sub>i</sub>(x) 
+
+= - (0 * LN(0) + 0 * LN(0) + 1 * LN(0.95) + 0 * LN(0.05) + 0 * LN(0) + 0 * LN(0.20) + 0 * LN(0) + 0 * LN(0) + 0 * LN(0) + 0 * LN(0))
+
+= - (LN(0.95))
+
+= 0.05129
+
+**This is much better!**
+
+#### If you would like to get more information on this, see: 
+* https://en.wikipedia.org/wiki/Cross_entropy 
+* https://towardsdatascience.com/understanding-binary-cross-entropy-log-loss-a-visual-explanation-a3ac6025181a
+* https://medium.com/activating-robotic-minds/demystifying-cross-entropy-e80e3ad54a8
+* A Questionable StackOverflow CE function: https://stackoverflow.com/questions/49473587/how-to-compute-log-loss-same-as-cross-entropy
+"""
+
+def cross_entropy(x, y):
+    x = [element if element > 0 else 1 for element in x] # replace prediction probabilities of 0 to prevent LN(0), which is undefined.  Instead replace LN(1) = 0, which cancels out the term anyway
+    print(x)
+    pred = np.array(x)
+    targ = np.array(y)
+    
+    N = pred.shape[0] # A stack overflow divided by this number, which seems to conflict with my research (see above)
+    return -np.sum(targ*np.log(pred))
+
+predictions1 = [0.0, 0.0, 0.65, 0.15, 0.0, 0.20, 0.0, 0.0, 0.0, 0.0]
+targets1     = [0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+
+cross_entropy(predictions1, targets1)
+
+predictions2 =  [0.0, 0.0, 0.95, 0.05, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+targets2     =  [0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+
+cross_entropy(predictions2, targets2)
+
+"""# Example 2: Building a Highly Accurate Image Classifification Model Step-by-Step
+## Create a Vector
+"""
 
 import keras
 from keras.datasets import mnist
@@ -96,7 +224,9 @@ y_train = keras.utils.to_categorical(y_train, num_classes)
 y_test = keras.utils.to_categorical(y_test, num_classes)
 print('First 5 training lables as one-hot encoded vectors:\n', y_train[:5])
 
-"""### For fully connected neural networks, there are three essential questions that define the network’s architecture:
+"""The **number of classes** represents the number of unique digits we have.  This will be the number of categories we can split them up into.  This number represents the number of output nodes or probabilities.
+
+### For fully connected neural networks, there are three essential questions that define the network’s architecture:
 1. How many layers are there?
 2. How many nodes are there in each of those layers?
 3. What transfer/activation function is used at each of those layers?
@@ -117,21 +247,13 @@ More information on loss functions and optimiizers can be found here: https://ml
 Dense layers are "fully connected" layers
 Documentation: https://keras.io/models/sequential/
 
-The input layer requires the special input_shape parameter which should match the shape of our training data.
-
-The **image_size** is a created by flattening an image to **28 X 28 or 28^2 = 784**
-
-**num_classes** represents the number of output nodes or probabilities
-
-This model has **a single hidden layer**, **that has 32 nodes, or 32 biases** using the sigmoid activation function
-
-And, since there are 784 square units, on 1 layer, that has 32 nodes, there are **784 x 1 x 32 = 25,088 weights**, where weights represent the number of pixels
-
-Therefore, there are 25,088 + 32 biases = **25,120 parameters**
-
-There are 32 x 10, or **320 weights from hidden layer to output layer**.
-
-Each of the 10 nodes adds a single bias >> 25,120 par + 320 weights + 10 nodes = **25,450 total parameters**
+* The input layer requires the special input_shape parameter which should match the shape of our training data.
+* The image_size is a created by flattening an image to 28 X 28 or 28<sup>2</sup>  = 784
+* This model has a single hidden layer, that has 32 nodes, or 32 biases using the sigmoid activation function
+* And, since there are 784 square units, on 1 layer, that has 32 nodes, there are 784 x 1 x 32 = 25,088 weights, where weights represent the number of pixels
+* Therefore, there are 25,088 + 32 biases = 25,120 parameters
+* There are 32 x 10, or 320 weights from hidden layer to output layer.
+* Each of the 10 nodes adds a single bias >> 25,120 par + 320 weights + 10 nodes = 25,450 total parameters
 """
 
 from keras.layers import Dense, Flatten 
@@ -213,12 +335,16 @@ print(f'Test accuracy: {accuracy:.3}')
 ### Let's see what this model can predict...
 """
 
-img = int(input('Enter an index over 4440: '))
+img = 1500
 plt.imshow(x_test[img].reshape(28,28),cmap='Greys')
 pred = model.predict(x_test[img].reshape(1, 28, 28))
 print(pred.argmax())
 
-"""## Network Depth and Layer Width
+"""*** Looks like we still have some work to do! ***
+
+This image is obviously not a 1.  We will look to increase accuracy in the next section.
+
+## Network Depth and Layer Width
 https://medium.com/tebs-lab/how-to-classify-mnist-digits-with-different-neural-network-architectures-39c75a0f03e3 **continues...**
 """
 
