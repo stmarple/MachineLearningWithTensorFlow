@@ -96,6 +96,11 @@ plt.imshow(x_test[img].reshape(28,28),cmap='Greys')
 pred = modelA.predict(x_test[img].reshape(1, 28, 28))
 print(pred.argmax())
 
+img = 1500
+plt.imshow(x_test[img].reshape(28,28),cmap='Greys')
+pred = modelA.predict(x_test[img].reshape(1, 28, 28))
+print(pred.argmax())
+
 """*** Looks like this classifies these digits pretty well! ***
 # In this next section... 
 We will discuss alternate methods of achieving similiar success.  We will look to add nodes and layers, we will choose different optimizers and activation functions and see how that changes the outcome.  We will also go step-by-step on the models work, what each optimizer and activation functions are [that we may use in a problem like this], as well as how the steps are calculated to get a decent understanding on how the model works behind the scenes to enable us to build a foundation for understanding machine learning.
@@ -132,7 +137,7 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import log_loss
 import numpy as np
 
-"""# Cross Entropy:
+"""# [Categorical] Cross Entropy:
 ## H(p, q) = E<sub>p</sub> [ -log q(x) ] = -$\sum_{i}^C$ p<sub>i</sub>(x) * Log q<sub>i</sub>(x)
 Where:
 * p is the true probability, given the distribution
@@ -142,7 +147,7 @@ Where:
 
 ### _So, let's try to understand this a bit_
  
-Say we have an image of digits: a 2 and a 9.
+Say we have an image of digit 2.
 Each image can only be entirely one number on a scale of 0 to 9. 
 
 #### Therefore our vector would look like this: 
@@ -222,7 +227,7 @@ print('First 5 training labels: ', y_train[:5]) # [5, 0, 4, 1, 9]
 num_classes = 10
 y_train = keras.utils.to_categorical(y_train, num_classes)
 y_test = keras.utils.to_categorical(y_test, num_classes)
-print('First 5 training lables as one-hot encoded vectors:\n', y_train[:5])
+print('First 5 training labels as one-hot encoded vectors:\n', y_train[:5])
 
 """The **number of classes** represents the number of unique digits we have.  This will be the number of categories we can split them up into.  This number represents the number of output nodes or probabilities.
 
@@ -246,6 +251,8 @@ More information on loss functions and optimiizers can be found here: https://ml
 ## Creating First Model
 Dense layers are "fully connected" layers
 Documentation: https://keras.io/models/sequential/
+
+* "The sequential model is a linear stack of layers" (https://keras.io/getting-started/sequential-model-guide/)
 
 * The input layer requires the special input_shape parameter which should match the shape of our training data.
 * The image_size is a created by flattening an image to 28 X 28 or 28<sup>2</sup>  = 784
@@ -315,7 +322,6 @@ model.add(Dense(units=num_classes, activation='softmax'))
 model.summary()
 
 model.compile(optimizer="sgd", loss='categorical_crossentropy', metrics=['accuracy'])
-
 history = model.fit(x_train, y_train, batch_size=128, epochs=5, validation_split=0.1)
 loss, accuracy  = model.evaluate(x_test, y_test, verbose=False)
 
@@ -332,7 +338,7 @@ print(f'Test accuracy: {accuracy:.3}')
 
 """It looks like the training model has gotten much better.  However, there is still much to be done about the test loss of more than 32%.
 
-### Let's see what this model can predict...
+## Let's see what this model can predict...
 """
 
 img = 1500
@@ -346,5 +352,283 @@ This image is obviously not a 1.  We will look to increase accuracy in the next 
 
 ## Network Depth and Layer Width
 https://medium.com/tebs-lab/how-to-classify-mnist-digits-with-different-neural-network-architectures-39c75a0f03e3 **continues...**
+
+### In this section, we will be adding layers and determining whether or not there is a positive impact on our model
 """
 
+image_size = 784 # 28*28
+num_classes = 10 # ten unique digits
+
+def create_depth(layer_sizes):
+    model = Sequential()
+    model.add(Flatten(input_shape=(28, 28)))
+    model.add(Dense(units=128, activation='sigmoid', input_shape=(image_size,))) # increase from 32 nodes to 128 **
+    
+    for layer_size in layer_sizes[1:]:
+      model.add(Dense(units=num_classes, activation='sigmoid'))
+    
+    model.add(Dense(units=num_classes, activation='softmax'))
+    return model
+    
+def eval(model, batch_size=128, epochs=5):
+    model.compile(optimizer='sgd', loss='categorical_crossentropy', metrics=['accuracy'])
+    history = model.fit(x_train, y_train, batch_size=batch_size, epochs=epochs, validation_split=0.1, verbose=False)
+    loss, accuracy  = model.evaluate(x_test, y_test, verbose=False)
+
+    plt.plot(history.history['acc'])
+    plt.plot(history.history['val_acc'])
+    plt.title('model accuracy')
+    plt.ylabel('accuracy')
+    plt.xlabel('epoch')
+    plt.legend(['training', 'validation'], loc='best')
+    plt.show()
+
+    print(f'Test loss: {loss:.3}')
+    print(f'Test accuracy: {accuracy:.3}')
+
+"""### As we can see in the next cells, added hidden layers with sigmoid activation functions and 32 nodes, doesn't seem to help us on the quest to best accuracy.  We may need to consider tweaking for at least some positive change"""
+
+for layers in range(1,4):
+    mod = create_depth([32] * layers)
+    if layers == 1:
+        print(f'Model with{layers: 1} hidden layer')
+    else:
+        print(f'Model with{layers: 1} hidden layers')
+    eval(mod)
+    print()
+
+"""As you can see, the current model is using:
+* SGD, or stochastic gradient descent, is a system or process that selects a few samples at random for each iteration, rather than selecting the entire dataset.  SGD uses a single sample, ie a batch of 1, to perform each iteration.  The sample is then shuffled and selected for the iteration.  The following is the calculation for the SGD algorithm: 
+
+> for i in range( m ):
+> > $\theta$<sub>j</sub> = $\theta$<sub>j</sub> - $\alpha$ * ( $\hat{y}$<sup>i</sup> - y<sup>i</sup> ) * x<sub>j</sub><sup>i</sup> 
+
+> Although I have not been able to find an understandable breakdown of this equation.  It appears to resemble the formula of a line: y - y<sub>1</sub> = m(x - x<sub>1</sub>)
+* loss = categorical_crossentropy
+* The create_depth function will create a multilayer perceptron with a selected array of sizes, each with 32 nodes
+* As we can see from the results, as soon as an additional layer was added, our model immediately became ***overfit***.*
+
+### Now, let's consider training the same 32 nodes for 50 epochs instead of 5...
+"""
+
+for layers in range(1,4):
+    mod = create_depth([32] * layers)
+    if layers == 1:
+        print(f'Model with{layers: 1} hidden layer')
+    else:
+        print(f'Model with{layers: 1} hidden layers')
+    eval(mod, 128, 50)
+    print()
+
+"""### It still looks like 1 hidden layer is still the best, with an improved accuracy of nearly 96%.
+
+## Now, we will take a closer look at what happens as we increase / decrease numbers of nodes (or pixels)
+"""
+
+for nodes in [32, 128, 512, 2048]:
+    mod = create_depth([nodes])
+    print(f'Model with{nodes: 1} nodes')
+    eval(mod)
+    print()
+
+"""### As we can see, the number of nodes in this example failed to really make an impact on our model
+
+## Now, let's try adding larger layers to the model
+In other words, we will increase the nodes and increase the number of hidden layers in attempt to push the envelope on accuracy
+"""
+
+for nodes_per_layer in [32, 512]:
+    
+    for layers in [3, 5]:
+        mod = create_depth([nodes_per_layer] * layers)
+        print(f'Model with{nodes_per_layer: 1} nodes')
+        print(f'With{layers: 1} hidden layers')
+        eval(mod, epochs=15)
+        print()
+
+"""### Wow!  That really didn't help at all!
+
+## One final change that I would like to do is by decreasing the batch size of each iteration from 128 to 16, with 32 nodes, over 25 epochs and determine if that will many any impact
+"""
+
+mod = create_depth([32])
+eval(mod, 16, 25)
+
+"""## Test it"""
+
+img = 1500
+plt.imshow(x_test[img].reshape(28,28),cmap='Greys')
+pred = mod.predict(x_test[img].reshape(1, 28, 28))
+print(pred.argmax())
+
+"""## Lets Tweak a 3rd Example With What We Have Learned"""
+
+image_size = 28**2 # 28*28
+num_classes = 10 # ten unique digits
+
+def create_model(layer_sizes,activation_func='sigmoid',mode='softmax', mode2=None):
+    model = Sequential()
+    model.add(Flatten(input_shape=(28, 28)))
+    model.add(Dense(units=128, activation=activation_func, input_shape=(image_size,))) # increase from 32 nodes to 128 **
+    
+    for layer_size in layer_sizes[1:]:
+      model.add(Dense(units=num_classes, activation=activation_func))    
+
+    model.add(Dense(units=num_classes, activation=mode))
+    
+    if mode2 != None:
+      model.add(Dense(units=num_classes, activation=mode2))
+    return model
+    
+def eval(model, batch_size=128, epochs=5, opt='sgd', loss_func='categorical_crossentropy'):
+    model.compile(optimizer=opt, loss=loss_func, metrics=['accuracy'])
+    history = model.fit(x_train, y_train, batch_size=batch_size, epochs=epochs, validation_split=0.1, verbose=False)
+    loss, accuracy  = model.evaluate(x_test, y_test, verbose=False)
+
+    plt.plot(history.history['acc'])
+    plt.plot(history.history['val_acc'])
+    plt.title('model accuracy')
+    plt.ylabel('accuracy')
+    plt.xlabel('epoch')
+    plt.legend(['training', 'validation'], loc='best')
+    plt.show()
+
+    print(f'Test loss: {loss:.3}')
+    print(f'Test accuracy: {accuracy:.3}')
+
+af = 'tanh'
+opt = 'sgd'
+loss = 'mse'
+batch = 128
+epoch = 5
+mode = 'softmax'
+
+for layers in [1, 2]:
+    mod = create_model([32] * layers, af)
+    print(f'Activation Function: {af, mode}')
+    print(f'Model with{32: 1} nodes')
+    print(f'With{layers: 1} hidden layer')
+    print(f'Loss function: {loss}')
+    print(f'Optimizer: {opt}')
+    eval(mod, batch, epoch,opt, loss)
+    
+    print()
+
+"""### In the previous model, we were able to minimize test loss, but were not able to increase accuracy, which is what we are aiming for.  The model is using:
+* The Tanh activation function
+* The Mean Squared Error loss function
+* The Stochastic Gradient Descent (SGD) Optimizer
+* 32 Nodes
+* One and two hidden layers
+
+### Next, we'll attempt to change the change the optimizer to Adam and keep all other hyperparameters. We'll also stick with a single hidden layer, since that doesn't seem to be helping in this situation:
+"""
+
+af = 'tanh'
+opt = 'adam'
+loss = 'mse'
+batch = 128
+epoch = 5
+nodes = 32
+mode = 'softmax'
+
+mod = create_model([nodes], af)
+print(f'Activation Function: {af, mode}')
+print(f'Model with{32: 1} nodes')
+print(f'Loss function: {loss}')
+print(f'Optimizer: {opt}')
+eval(mod, batch, epoch,opt, loss)
+print()
+
+mod.compile(optimizer=opt, loss=loss, metrics=['accuracy'])
+img = 1500
+plt.imshow(x_test[img].reshape(28,28),cmap='Greys')
+pred = mod.predict(x_test[img].reshape(1, 28, 28))
+print(pred.argmax())
+
+"""### The accuracy is much better, and with low test loss! 
+> However, we still have a way to go on the accuracy.  I'd like to see it over 95%.
+"""
+
+af = 'tanh'
+opt = 'adam'
+loss = 'mae'
+batch = 128
+epoch = 5
+nodes = 32
+mode = 'softmax'
+
+mod = create_model([nodes], af)
+print(f'Activation Function: {af, mode}')
+print(f'Model with{32: 1} nodes')
+print(f'Loss function: {loss}')
+print(f'Optimizer: {opt}')
+eval(mod, batch, epoch,opt, loss)
+print()
+
+"""### It appears there isn't much difference between mean squared error vs mean absolute error.  We'll switch back to MSE, since the loss is so much lower in comparison to the tiny increase in test accuracy, for the next one and increase the node pixels to 512"""
+
+af = 'tanh'
+opt = 'adam'
+loss = 'mse'
+batch = 128
+epoch = 5
+nodes = 128
+mode = 'softmax'
+
+mod = create_model([nodes], af)
+print(f'Activation Function: {af, mode}')
+print(f'Model with{nodes: 1} nodes')
+print(f'Loss function: {loss}')
+print(f'Optimizer: {opt}')
+eval(mod, batch, epoch,opt, loss)
+print()
+
+af = 'tanh'
+opt = 'adam'
+loss = 'mse'
+batch = 128
+epoch = 5
+nodes = 128
+mode = 'sigmoid'
+
+mod = create_model([nodes], af, mode)
+print(f'Activation Function: {af, mode}')
+print(f'Model with{nodes: 1} nodes')
+print(f'Loss function: {loss}')
+print(f'Optimizer: {opt}')
+eval(mod, batch, epoch,opt, loss)
+print()
+
+img = 1501
+plt.imshow(x_test[img].reshape(28,28),cmap='Greys')
+pred = mod.predict(x_test[img].reshape(1, 28, 28))
+print(pred.argmax())
+
+af = 'tanh'
+opt = 'rmsprop'
+loss = 'categorical_crossentropy'
+batch = 128
+epoch = 5
+nodes = 64
+mode = 'sigmoid'
+mode2 = 'softmax'
+
+mod = create_model([nodes], af, mode, mode2)
+print(f'Activation Function: {af, mode, mode2}')
+print(f'Model with{nodes: 1} nodes')
+print(f'Loss function: {loss}')
+print(f'Optimizer: {opt}')
+eval(mod, batch, epoch,opt, loss)
+print()
+
+"""### It looks the accuracy isn't going to get much better than this at this time.  However, by looking over our progression, it is easy to see how far we've come just by tweaking different parameters and seeing how the model responds"""
+
+
+
+mod.compile(optimizer=opt, loss=loss, metrics=['accuracy'])
+
+img = randint(1, 5000)
+plt.imshow(x_test[img].reshape(28,28),cmap='Greys')
+pred = mod.predict(x_test[img].reshape(1, 28, 28))
+print(pred.argmax())
